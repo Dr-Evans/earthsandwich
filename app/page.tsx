@@ -1,102 +1,121 @@
-import Image from 'next/image'
-import { Inter } from 'next/font/google'
-import styles from './page.module.css'
+"use client";
 
-const inter = Inter({ subsets: ['latin'] })
+import largeCities from "./data/large-cities.json";
+import React, { useMemo, useState } from "react";
+import {
+  GoogleMap,
+  LoadScriptNext,
+  Marker,
+  useJsApiLoader,
+} from "@react-google-maps/api";
+import { useGeolocation as useBrowserGeolocation } from "react-use";
+import { distance } from "@/app/utils/distance";
 
-export default function Home() {
-  return (
-    <main className={styles.main}>
-      <div className={styles.description}>
-        <p>
-          Get started by editing&nbsp;
-          <code className={styles.code}>app/page.tsx</code>
-        </p>
-        <div>
-          <a
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className={styles.vercelLogo}
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
-      </div>
-
-      <div className={styles.center}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className={styles.grid}>
-        <a
-          href="https://beta.nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={inter.className}>
-            Docs <span>-&gt;</span>
-          </h2>
-          <p className={inter.className}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={inter.className}>
-            Learn <span>-&gt;</span>
-          </h2>
-          <p className={inter.className}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={inter.className}>
-            Templates <span>-&gt;</span>
-          </h2>
-          <p className={inter.className}>Explore the Next.js 13 playground.</p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={inter.className}>
-            Deploy <span>-&gt;</span>
-          </h2>
-          <p className={inter.className}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  )
+enum Location {
+  EXACT,
+  LANDMASS,
+  LARGE_CITY,
 }
+
+const mapContainerStyle = {
+  width: "400px",
+  height: "400px",
+};
+
+const Home = () => {
+  const { isLoaded: isGoogleMapsLoaded, loadError: googleMapsLoaderError } =
+    useJsApiLoader({
+      googleMapsApiKey:
+        process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "MISSING_API_KEY",
+    });
+
+  let {
+    loading: isBrowserGeolocationLoading,
+    error: browserGeolocationError,
+    latitude,
+    longitude,
+  } = useBrowserGeolocation();
+
+  latitude ??= 0;
+  longitude ??= 0;
+
+  const [selectedLocation, setSelectedLocation] = useState<Location>(
+    Location.LARGE_CITY
+  );
+
+  console.log({ isGoogleMapsLoaded });
+  console.log({ isBrowserGeolocationLoading });
+  console.log([latitude, longitude]);
+
+  let earthSandwichPosition = useMemo<google.maps.LatLngLiteral>(
+    () => ({
+      // @ts-ignore idk why typescript thinks this
+      lat: latitude * -1,
+      // @ts-ignore idk why typescript thinks this
+      lng: longitude + 180,
+    }),
+    [latitude, longitude]
+  );
+
+  if (browserGeolocationError || googleMapsLoaderError) {
+    return <div>Map cannot be loaded right now, sorry.</div>;
+  }
+
+  // switch (selectedLocation) {
+  //   case Location.EXACT:
+  //     // do nothing
+  //     break;
+  //   case Location.LANDMASS:
+  //     // TODO
+  //     break;
+  //   case Location.LARGE_CITY:
+  //     let currNearestDistance = Number.MAX_VALUE;
+  //     largeCities.forEach((c) => {
+  //       if (
+  //         distance(
+  //           earthSandwichPosition.lng,
+  //           earthSandwichPosition.lat,
+  //           c.loc.coordinates[1],
+  //           c.loc.coordinates[0]
+  //         ) < currNearestDistance
+  //       ) {
+  //         earthSandwichPosition = {
+  //           lat: c.loc.coordinates[1],
+  //           lng: c.loc.coordinates[0],
+  //         };
+  //       }
+  //     });
+  //     console.log(earthSandwichPosition);
+  //     break;
+  // }
+
+  return (
+    <>
+      <h1>Earth Sandwich</h1>
+      <form>
+        <button onClick={() => setSelectedLocation(Location.EXACT)}>
+          Exact Location
+        </button>
+        <button onClick={() => setSelectedLocation(Location.LANDMASS)}>
+          Nearest Landmass
+        </button>
+        <button onClick={() => setSelectedLocation(Location.LARGE_CITY)}>
+          Nearest Large City
+        </button>
+      </form>
+      {isGoogleMapsLoaded && !isBrowserGeolocationLoading ? (
+        <GoogleMap
+          mapContainerStyle={mapContainerStyle}
+          center={earthSandwichPosition}
+          zoom={2}
+        >
+          <Marker position={earthSandwichPosition} />
+        </GoogleMap>
+      ) : (
+        <div>Loading...</div>
+      )}
+    </>
+  );
+};
+
+export default React.memo(Home);
